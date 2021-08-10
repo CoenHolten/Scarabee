@@ -4,7 +4,9 @@ use rocket::{
     Request,
 };
 
+use super::schema::group_adoptions;
 use super::schema::groups;
+use super::schema::user_relations;
 use super::schema::users;
 
 #[derive(Queryable, FromForm, Insertable)]
@@ -65,4 +67,19 @@ pub struct Group {
     pub commitment: String,
     pub is_commitment: i8, // zero means false
     pub is_concept: i8,    // zero means false
+}
+
+#[derive(Queryable, FromForm, Insertable, AsChangeset)]
+pub struct UserRelation {
+    pub user: Option<String>,
+    pub group: String,
+    pub is_adoption: Option<i8>, // zero means false
+    pub is_support: Option<i8>,  // zero means false
+}
+
+#[derive(Queryable, FromForm, Insertable, AsChangeset)]
+pub struct GroupAdoption {
+    pub user: Option<String>,
+    pub parent_group: String,
+    pub child_group: String,
 }
