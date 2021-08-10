@@ -15,9 +15,9 @@ CREATE SCHEMA IF NOT EXISTS `3ways_db` DEFAULT CHARACTER SET utf8 ;
 USE `3ways_db` ;
 
 -- -----------------------------------------------------
--- Table `3ways_db`.`user`
+-- Table `3ways_db`.`users`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `3ways_db`.`user` (
+CREATE TABLE IF NOT EXISTS `3ways_db`.`users` (
   `name` VARCHAR(16) NOT NULL,
   `password` VARCHAR(32) NOT NULL,
   `email` VARCHAR(255) NULL,
@@ -26,36 +26,36 @@ CREATE TABLE IF NOT EXISTS `3ways_db`.`user` (
 
 
 -- -----------------------------------------------------
--- Table `3ways_db`.`group`
+-- Table `3ways_db`.`groups`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `3ways_db`.`group` (
+CREATE TABLE IF NOT EXISTS `3ways_db`.`groups` (
   `name` VARCHAR(16) NOT NULL,
   `description` LONGTEXT NOT NULL,
   `commitment` LONGTEXT NULL,
   `is_commitment` TINYINT NOT NULL,
-  `concept` LONGTEXT NULL,
+  `is_concept` TINYINT NULL,
   PRIMARY KEY (`name`))
 ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `3ways_db`.`user_relation`
+-- Table `3ways_db`.`user_relations`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `3ways_db`.`user_relation` (
+CREATE TABLE IF NOT EXISTS `3ways_db`.`user_relations` (
   `user` VARCHAR(16) NOT NULL,
   `group` VARCHAR(16) NOT NULL,
-  `accepts_concept` TINYINT NOT NULL COMMENT 'also indicates if the writer of the concept thinks it is ready',
   `is_adoption` TINYINT NOT NULL,
+  `is_support` TINYINT NOT NULL,
   PRIMARY KEY (`user`, `group`),
   INDEX `group_idx` (`group` ASC) VISIBLE,
-  CONSTRAINT `user`
+  CONSTRAINT `relation_user`
     FOREIGN KEY (`user`)
-    REFERENCES `3ways_db`.`user` (`name`)
+    REFERENCES `3ways_db`.`users` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
-  CONSTRAINT `group`
+  CONSTRAINT `relation_group`
     FOREIGN KEY (`group`)
-    REFERENCES `3ways_db`.`group` (`name`)
+    REFERENCES `3ways_db`.`groups` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
@@ -71,19 +71,19 @@ CREATE TABLE IF NOT EXISTS `3ways_db`.`group_adoptions` (
   PRIMARY KEY (`user`, `child_group`, `parent_group`),
   INDEX `parent_group_idx` (`parent_group` ASC) VISIBLE,
   INDEX `child_group_idx` (`child_group` ASC) INVISIBLE,
-  CONSTRAINT `group_user`
+  CONSTRAINT `adoption_user`
     FOREIGN KEY (`user`)
-    REFERENCES `3ways_db`.`user` (`name`)
+    REFERENCES `3ways_db`.`users` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
-  CONSTRAINT `parent_group`
+  CONSTRAINT `adoption_parent`
     FOREIGN KEY (`parent_group`)
-    REFERENCES `3ways_db`.`group` (`name`)
+    REFERENCES `3ways_db`.`groups` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
-  CONSTRAINT `child_group`
+  CONSTRAINT `adoption_child`
     FOREIGN KEY (`child_group`)
-    REFERENCES `3ways_db`.`group` (`name`)
+    REFERENCES `3ways_db`.`groups` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
