@@ -1,27 +1,32 @@
 table! {
-    group_adoptions (user, child_group, parent_group) {
+    commitment_supports (user, commitment) {
         user -> Varchar,
-        parent_group -> Varchar,
-        child_group -> Varchar,
+        commitment -> Varchar,
     }
 }
 
 table! {
-    groups (name) {
+    commitments (name) {
         name -> Varchar,
-        description -> Longtext,
-        commitment -> Nullable<Longtext>,
-        is_commitment -> Tinyint,
-        is_concept -> Nullable<Tinyint>,
+        description -> Text,
+        is_concept -> Tinyint,
     }
 }
 
 table! {
-    user_relations (user, group) {
+    initiative_supports (user, initiative_commitment, initiative_name) {
         user -> Varchar,
-        group -> Varchar,
-        is_adoption -> Tinyint,
-        is_support -> Tinyint,
+        initiative_commitment -> Varchar,
+        initiative_name -> Varchar,
+    }
+}
+
+table! {
+    initiatives (commitment, name) {
+        commitment -> Varchar,
+        name -> Varchar,
+        description -> Text,
+        user -> Nullable<Varchar>,
     }
 }
 
@@ -29,18 +34,21 @@ table! {
     users (name) {
         name -> Varchar,
         password -> Varchar,
-        email -> Nullable<Varchar>,
-        phone -> Nullable<Varchar>,
+        email -> Varchar,
+        phone -> Varchar,
     }
 }
 
-joinable!(group_adoptions -> users (user));
-joinable!(user_relations -> groups (group));
-joinable!(user_relations -> users (user));
+joinable!(commitment_supports -> commitments (commitment));
+joinable!(commitment_supports -> users (user));
+joinable!(initiative_supports -> users (user));
+joinable!(initiatives -> commitments (commitment));
+joinable!(initiatives -> users (user));
 
 allow_tables_to_appear_in_same_query!(
-    group_adoptions,
-    groups,
-    user_relations,
+    commitment_supports,
+    commitments,
+    initiative_supports,
+    initiatives,
     users,
 );

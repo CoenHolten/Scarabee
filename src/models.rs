@@ -1,85 +1,50 @@
-use blake2::{Blake2s, Digest};
-use rocket::{
-    request::{self, FromRequest},
-    Request,
-};
+use super::schema::*;
 
-use super::schema::group_adoptions;
-use super::schema::groups;
-use super::schema::user_relations;
-use super::schema::users;
-
-#[derive(Queryable, FromForm, Insertable)]
+#[derive(Queryable, FromForm, Insertable, Identifiable, AsChangeset)]
+#[primary_key(name)]
 pub struct User {
     pub name: String,
     pub password: String, // this is a hash
-    pub email: Option<String>,
-    pub phone: Option<String>,
+    pub email: String,
+    pub phone: String,
+}
+
+#[derive(Queryable, FromForm, Identifiable)]
+#[primary_key(name)]
+#[table_name = "users"]
+pub struct UserLogin {
+    pub name: String,
+    pub password: String, // this is a hash
+}
+
+#[derive(Queryable, FromForm, Insertable, Identifiable)]
+#[primary_key(name)]
+pub struct Commitment {
+    pub name: String,
+    pub description: String,
+    pub is_concept: i8, // zero means false
 }
 
 #[derive(FromForm, AsChangeset)]
-#[table_name = "users"]
-pub struct UserEdit {
-    pub password: Option<String>, // this is a hash
-    pub email: Option<String>,
-    pub phone: Option<String>,
+#[table_name = "commitments"]
+pub struct CommitmentEdit {
+    pub name: String,
+    pub description: Option<String>,
+    pub is_concept: Option<i8>, // zero means false
 }
 
-impl User {
-    pub fn hash_password(&mut self) {
-        let name = self.name.as_bytes();
-        let mut hasher = Blake2s::with_params(&[], name, &[]);
-        hasher.update(&self.password);
-        self.password = hex::encode(hasher.finalize());
-    }
+#[derive(FromForm, Insertable)]
+pub struct InitiativeSupport {
+    pub initiative_commitment: String,
+    pub initiative_name: String,
 }
 
-impl UserEdit {
-    pub fn hash_password(&mut self, name: &str) {
-        if let Some(ref pass) = self.password {
-            let mut hasher = Blake2s::with_params(&[], name.as_bytes(), &[]);
-            hasher.update(pass);
-            self.password = Some(hex::encode(hasher.finalize()));
-        }
-    }
-}
-
-pub struct UserAuth(pub String);
-
-#[rocket::async_trait]
-impl<'r> FromRequest<'r> for UserAuth {
-    type Error = ();
-
-    async fn from_request(req: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
-        let username = req.cookies().get_private("name");
-        if username.is_none() {
-            return request::Outcome::Forward(());
-        }
-        let username = username.as_ref().unwrap().value();
-        request::Outcome::Success(UserAuth(username.to_string()))
-    }
-}
-
-#[derive(Queryable, FromForm, Insertable)]
-pub struct Group {
+#[derive(Queryable, FromForm, Insertable, Associations, Identifiable, AsChangeset)]
+#[belongs_to(Commitment, foreign_key = "commitment")]
+#[primary_key(commitment, name)]
+pub struct Initiative {
+    pub commitment: String,
     pub name: String,
     pub description: String,
-    pub commitment: String,
-    pub is_commitment: i8, // zero means false
-    pub is_concept: i8,    // zero means false
-}
-
-#[derive(Queryable, FromForm, Insertable, AsChangeset)]
-pub struct UserRelation {
     pub user: Option<String>,
-    pub group: String,
-    pub is_adoption: Option<i8>, // zero means false
-    pub is_support: Option<i8>,  // zero means false
-}
-
-#[derive(Queryable, FromForm, Insertable, AsChangeset)]
-pub struct GroupAdoption {
-    pub user: Option<String>,
-    pub parent_group: String,
-    pub child_group: String,
 }

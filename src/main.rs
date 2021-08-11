@@ -6,6 +6,7 @@ extern crate rocket;
 extern crate blake2;
 extern crate hex;
 
+mod auth;
 mod connection;
 mod models;
 mod schema;
@@ -20,18 +21,16 @@ use rocket::http::Cookie;
 use rocket::http::CookieJar;
 use rocket::http::Status;
 
-use crate::models::Group;
-use crate::models::GroupAdoption;
-use crate::models::UserEdit;
-use crate::models::UserRelation;
+use crate::auth::UserAuth;
+use crate::models::Commitment;
+use crate::models::Initiative;
+use crate::models::InitiativeSupport;
+use crate::models::UserLogin;
 
-use {
-    connection::establish_connection,
-    models::{User, UserAuth},
-};
+use {connection::establish_connection, models::User};
 
-#[post("/new_user", data = "<user>")]
-fn new_user(mut user: Form<User>, cookies: &CookieJar<'_>) -> Status {
+#[post("/user_new", data = "<user>")]
+fn user_new(mut user: Form<User>, cookies: &CookieJar<'_>) -> Status {
     let conn = establish_connection();
 
     use schema::users::dsl::*;
@@ -50,30 +49,29 @@ fn new_user(mut user: Form<User>, cookies: &CookieJar<'_>) -> Status {
     }
 }
 
-#[post("/edit_user", data = "<user_edit>")]
-fn edit_user(user: UserAuth, mut user_edit: Form<UserEdit>) -> Status {
+#[post("/user_edit", data = "<user>")]
+fn user_edit(auth: UserAuth, mut user: Form<User>) -> Status {
+    if auth.0 != user.name {
+        return Status::Unauthorized;
+    }
+
     let conn = establish_connection();
 
-    use schema::users::dsl::*;
-
-    user_edit.hash_password(&user.0);
-    diesel::update(users)
-        .filter(name.eq(&user.0))
-        .set(&*user_edit)
-        .execute(&conn)
-        .unwrap();
+    user.hash_password();
+    diesel::update(&*user).set(&*user).execute(&conn).unwrap();
 
     Status::Ok
 }
 
-#[post("/login", data = "<user>")]
-fn login(mut user: Form<User>, cookies: &CookieJar<'_>) -> Status {
+#[post("/user_login", data = "<user>")]
+fn user_login(mut user: Form<UserLogin>, cookies: &CookieJar<'_>) -> Status {
     let conn = establish_connection();
 
+    use crate::diesel::Identifiable;
     use schema::users::dsl::*;
 
     let db_user = users
-        .filter(name.eq(&user.name))
+        .find(&user.id())
         .get_result::<User>(&conn)
         .optional()
         .unwrap();
@@ -91,20 +89,20 @@ fn login(mut user: Form<User>, cookies: &CookieJar<'_>) -> Status {
     }
 }
 
-#[post("/logout")]
-fn logout(cookies: &CookieJar<'_>) -> Status {
+#[post("/user_logout")]
+fn user_logout(cookies: &CookieJar<'_>) -> Status {
     cookies.remove_private(Cookie::named("name"));
     Status::Ok
 }
 
-#[post("/new_group", data = "<group>")]
-fn new_group(user: UserAuth, group: Form<Group>) -> Status {
+#[post("/commitment_new", data = "<commitment>")]
+fn commitment_new(commitment: Form<Commitment>) -> Status {
     let conn = establish_connection();
 
-    use schema::groups::dsl::*;
+    use schema::commitments::dsl::*;
 
-    let count = diesel::insert_or_ignore_into(groups)
-        .values(&*group)
+    let count = diesel::insert_or_ignore_into(commitments)
+        .values(&*commitment)
         .execute(&conn)
         .unwrap();
 
@@ -115,53 +113,75 @@ fn new_group(user: UserAuth, group: Form<Group>) -> Status {
     }
 }
 
-#[post("/user_relation_set", data = "<relation>")]
-fn user_relation_set(user_auth: UserAuth, mut relation: Form<UserRelation>) {
-    relation.user = Some(user_auth.0.clone());
+#[post("/initiative_new", data = "<initiative>")]
+fn initiative_new(auth: UserAuth, initiative: Form<Initiative>) -> Status {
+    if initiative.user.is_some() && initiative.user.as_ref().unwrap() != &auth.0 {
+        return Status::Unauthorized;
+    }
 
     let conn = establish_connection();
 
-    use schema::user_relations::dsl::*;
+    use schema::initiatives::dsl::*;
 
-    let count = diesel::update(user_relations)
-        .filter(user.eq(&user_auth.0))
-        .filter(group.eq(&relation.group))
-        .set(&*relation)
+    let count = diesel::insert_or_ignore_into(initiatives)
+        .values(&*initiative)
         .execute(&conn)
         .unwrap();
 
-    if count == 0 {
-        diesel::insert_into(user_relations)
-            .values(&*relation)
-            .execute(&conn)
-            .unwrap();
+    if count == 1 {
+        let support = InitiativeSupport {
+            initiative_commitment: initiative.commitment.clone(),
+            initiative_name: initiative.name.clone(),
+        };
+
+        initiative_support_add(auth, Form::from(support));
+
+        Status::Created
+    } else {
+        Status::Conflict
     }
 }
 
-#[post("/group_relation_add", data = "<relation>")]
-fn group_adoption_add(user_auth: UserAuth, mut relation: Form<GroupAdoption>) {
-    relation.user = Some(user_auth.0);
-
+#[post("/initiative_new", data = "<initiative>")]
+fn initiative_edit(auth: UserAuth, initiative: Form<Initiative>) -> Status {
     let conn = establish_connection();
 
-    use schema::group_adoptions::dsl::*;
+    use schema::initiatives::dsl::*;
 
-    diesel::insert_or_ignore_into(group_adoptions)
-        .values(&*relation)
+    let count = diesel::update(&*initiative)
+        .set(&*initiative)
+        .execute(&conn)
+        .unwrap();
+
+    if count == 1 {
+        Status::Ok
+    } else {
+        Status::NotFound
+    }
+}
+
+#[post("/initiative_support_add", data = "<support>")]
+fn initiative_support_add(auth: UserAuth, support: Form<InitiativeSupport>) {
+    let conn = establish_connection();
+
+    use schema::initiative_supports::dsl::*;
+
+    diesel::insert_or_ignore_into(initiative_supports)
+        .values((user.eq(&auth.0), &*support))
         .execute(&conn)
         .unwrap();
 }
 
-#[post("/group_relation_remove", data = "<relation>")]
-fn group_adoption_remove(user_auth: UserAuth, relation: Form<GroupAdoption>) {
+#[post("/initiative_support_remove", data = "<support>")]
+fn initiative_support_remove(auth: UserAuth, support: Form<InitiativeSupport>) {
     let conn = establish_connection();
 
-    use schema::group_adoptions::dsl::*;
+    use schema::initiative_supports::dsl::*;
 
-    diesel::delete(group_adoptions)
-        .filter(user.eq(user_auth.0))
-        .filter(parent_group.eq(&relation.parent_group))
-        .filter(child_group.eq(&relation.child_group))
+    diesel::delete(initiative_supports)
+        .filter(user.eq(&auth.0))
+        .filter(initiative_commitment.eq(&support.initiative_commitment))
+        .filter(initiative_name.eq(&support.initiative_name))
         .execute(&conn)
         .unwrap();
 }
@@ -170,5 +190,8 @@ fn group_adoption_remove(user_auth: UserAuth, relation: Form<GroupAdoption>) {
 fn rocket() -> _ {
     dotenv().ok(); // doesn't matter if there is no env file
 
-    rocket::build().mount("/", routes![new_user, edit_user, login, logout, new_group])
+    rocket::build().mount(
+        "/",
+        routes![user_new, user_edit, user_login, user_logout, commitment_new],
+    )
 }

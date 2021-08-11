@@ -18,72 +18,86 @@ USE `3ways_db` ;
 -- Table `3ways_db`.`users`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `3ways_db`.`users` (
-  `name` VARCHAR(16) NOT NULL,
-  `password` VARCHAR(32) NOT NULL,
-  `email` VARCHAR(255) NULL,
-  `phone` VARCHAR(16) NULL,
+  `name` VARCHAR(45) NOT NULL,
+  `password` VARCHAR(45) NOT NULL,
+  `email` VARCHAR(45) NOT NULL,
+  `phone` VARCHAR(16) NOT NULL DEFAULT '',
   PRIMARY KEY (`name`));
 
 
 -- -----------------------------------------------------
--- Table `3ways_db`.`groups`
+-- Table `3ways_db`.`commitments`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `3ways_db`.`groups` (
-  `name` VARCHAR(16) NOT NULL,
-  `description` LONGTEXT NOT NULL,
-  `commitment` LONGTEXT NULL,
-  `is_commitment` TINYINT NOT NULL,
-  `is_concept` TINYINT NULL,
+CREATE TABLE IF NOT EXISTS `3ways_db`.`commitments` (
+  `name` VARCHAR(45) NOT NULL,
+  `description` TEXT NOT NULL,
+  `is_concept` TINYINT NOT NULL,
   PRIMARY KEY (`name`))
 ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `3ways_db`.`user_relations`
+-- Table `3ways_db`.`initiatives`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `3ways_db`.`user_relations` (
-  `user` VARCHAR(16) NOT NULL,
-  `group` VARCHAR(16) NOT NULL,
-  `is_adoption` TINYINT NOT NULL,
-  `is_support` TINYINT NOT NULL,
-  PRIMARY KEY (`user`, `group`),
-  INDEX `group_idx` (`group` ASC) VISIBLE,
-  CONSTRAINT `relation_user`
-    FOREIGN KEY (`user`)
-    REFERENCES `3ways_db`.`users` (`name`)
+CREATE TABLE IF NOT EXISTS `3ways_db`.`initiatives` (
+  `commitment` VARCHAR(45) NOT NULL,
+  `name` VARCHAR(45) NOT NULL,
+  `description` TEXT NOT NULL,
+  `user` VARCHAR(45) NULL,
+  PRIMARY KEY (`commitment`, `name`),
+  INDEX `fk_initiatives_commitments_idx` (`commitment` ASC) VISIBLE,
+  INDEX `fk_initiatives_users_idx` (`user` ASC) VISIBLE,
+  CONSTRAINT `fk_initiatives_commitments`
+    FOREIGN KEY (`commitment`)
+    REFERENCES `3ways_db`.`commitments` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
-  CONSTRAINT `relation_group`
-    FOREIGN KEY (`group`)
-    REFERENCES `3ways_db`.`groups` (`name`)
+  CONSTRAINT `fk_initiatives_users`
+    FOREIGN KEY (`user`)
+    REFERENCES `3ways_db`.`users` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `3ways_db`.`group_adoptions`
+-- Table `3ways_db`.`initiative_supports`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `3ways_db`.`group_adoptions` (
-  `user` VARCHAR(16) NOT NULL,
-  `parent_group` VARCHAR(16) NOT NULL,
-  `child_group` VARCHAR(16) NOT NULL,
-  PRIMARY KEY (`user`, `child_group`, `parent_group`),
-  INDEX `parent_group_idx` (`parent_group` ASC) VISIBLE,
-  INDEX `child_group_idx` (`child_group` ASC) INVISIBLE,
-  CONSTRAINT `adoption_user`
+CREATE TABLE IF NOT EXISTS `3ways_db`.`initiative_supports` (
+  `user` VARCHAR(45) NOT NULL,
+  `initiative_commitment` VARCHAR(45) NOT NULL,
+  `initiative_name` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`user`, `initiative_commitment`, `initiative_name`),
+  INDEX `fk_initiative_supports_initiative_idx` (`initiative_commitment` ASC, `initiative_name` ASC) INVISIBLE,
+  CONSTRAINT `fk_initiative_supports_user`
     FOREIGN KEY (`user`)
     REFERENCES `3ways_db`.`users` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
-  CONSTRAINT `adoption_parent`
-    FOREIGN KEY (`parent_group`)
-    REFERENCES `3ways_db`.`groups` (`name`)
+  CONSTRAINT `fk_initiative_supports_initiative`
+    FOREIGN KEY (`initiative_commitment` , `initiative_name`)
+    REFERENCES `3ways_db`.`initiatives` (`commitment` , `name`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `3ways_db`.`commitment_supports`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `3ways_db`.`commitment_supports` (
+  `user` VARCHAR(45) NOT NULL,
+  `commitment` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`user`, `commitment`),
+  INDEX `fk_commitment_supports_commitment_idx` (`commitment` ASC) VISIBLE,
+  CONSTRAINT `fk_commitment_supports_user`
+    FOREIGN KEY (`user`)
+    REFERENCES `3ways_db`.`users` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
-  CONSTRAINT `adoption_child`
-    FOREIGN KEY (`child_group`)
-    REFERENCES `3ways_db`.`groups` (`name`)
+  CONSTRAINT `fk_commitment_supports_commitment`
+    FOREIGN KEY (`commitment`)
+    REFERENCES `3ways_db`.`commitments` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
