@@ -1278,6 +1278,7 @@ dependencies = [
  "diesel",
  "dotenv",
  "hex",
+ "rand",
  "rocket",
  "serde",
  "serde_json",

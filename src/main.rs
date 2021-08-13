@@ -24,6 +24,7 @@ use rocket::http::CookieJar;
 use rocket::http::Status;
 use rocket::response::content;
 
+use crate::auth::random_id;
 use crate::auth::UserAuth;
 use crate::models::Commitment;
 use crate::models::Initiative;
@@ -34,22 +35,26 @@ use {connection::establish_connection, models::User};
 
 #[post("/user_new", data = "<user>")]
 fn user_new(mut user: Form<User>, cookies: &CookieJar<'_>) -> Status {
+    user.hash_password();
+    let old_name = user.name.clone();
+
     let conn = establish_connection();
 
-    use schema::users::dsl::*;
+    while {
+        user.name = random_id(&old_name);
 
-    user.hash_password();
-    let count = diesel::insert_or_ignore_into(users)
-        .values(&*user)
-        .execute(&conn)
-        .unwrap();
+        use schema::users::dsl::*;
 
-    if count == 1 {
-        cookies.add_private(Cookie::new("name", user.name.clone()));
-        Status::Created
-    } else {
-        Status::Conflict
-    }
+        let count = diesel::insert_or_ignore_into(users)
+            .values(&*user)
+            .execute(&conn)
+            .unwrap();
+
+        count == 0
+    } {}
+
+    cookies.add_private(Cookie::new("name", user.name.clone()));
+    Status::Created
 }
 
 #[post("/user_edit", data = "<user>")]
@@ -57,10 +62,10 @@ fn user_edit(auth: UserAuth, mut user: Form<User>) -> Status {
     if auth.0 != user.name {
         return Status::Unauthorized;
     }
+    user.hash_password();
 
     let conn = establish_connection();
 
-    user.hash_password();
     diesel::update(&*user).set(&*user).execute(&conn).unwrap();
 
     Status::Ok
@@ -68,19 +73,17 @@ fn user_edit(auth: UserAuth, mut user: Form<User>) -> Status {
 
 #[post("/user_login", data = "<user>")]
 fn user_login(mut user: Form<UserLogin>, cookies: &CookieJar<'_>) -> Status {
+    user.hash_password();
     let conn = establish_connection();
 
-    use crate::diesel::Identifiable;
     use schema::users::dsl::*;
-
     let db_user = users
-        .find(&user.id())
+        .find(&user.name)
         .get_result::<User>(&conn)
         .optional()
         .unwrap();
 
     if let Some(db_user) = db_user {
-        user.hash_password();
         if user.password == db_user.password {
             cookies.add_private(Cookie::new("name", user.name.clone()));
             Status::Accepted
@@ -98,7 +101,7 @@ fn user_logout(cookies: &CookieJar<'_>) -> Status {
     Status::Ok
 }
 
-#[post("/user/<user_name>")]
+#[get("/user/<user_name>")]
 fn user(_auth: UserAuth, user_name: &str) -> Result<content::Json<String>, Status> {
     let conn = establish_connection();
 
@@ -114,24 +117,27 @@ fn user(_auth: UserAuth, user_name: &str) -> Result<content::Json<String>, Statu
 }
 
 #[post("/commitment_new", data = "<commitment>")]
-fn commitment_new(commitment: Form<Commitment>) -> Status {
+fn commitment_new(_auth: UserAuth, mut commitment: Form<Commitment>) -> Status {
+    let old_name = commitment.name.clone();
+
     let conn = establish_connection();
 
-    use schema::commitments::dsl::*;
+    while {
+        commitment.name = random_id(&old_name);
 
-    let count = diesel::insert_or_ignore_into(commitments)
-        .values(&*commitment)
-        .execute(&conn)
-        .unwrap();
+        use schema::commitments::dsl::*;
+        let count = diesel::insert_or_ignore_into(commitments)
+            .values(&*commitment)
+            .execute(&conn)
+            .unwrap();
 
-    if count == 1 {
-        Status::Created
-    } else {
-        Status::Conflict
-    }
+        count == 0
+    } {}
+
+    Status::Created
 }
 
-#[post("/commitment/<commitment_name>")]
+#[get("/commitment/<commitment_name>")]
 fn commitment(_auth: UserAuth, commitment_name: &str) -> Result<content::Json<String>, Status> {
     let conn = establish_connection();
 
@@ -149,35 +155,38 @@ fn commitment(_auth: UserAuth, commitment_name: &str) -> Result<content::Json<St
 }
 
 #[post("/initiative_new", data = "<initiative>")]
-fn initiative_new(auth: UserAuth, initiative: Form<Initiative>) -> Status {
+fn initiative_new(auth: UserAuth, mut initiative: Form<Initiative>) -> Status {
     if initiative.user.is_some() && initiative.user.as_ref().unwrap() != &auth.0 {
         return Status::Unauthorized;
     }
 
+    let old_name = initiative.name.clone();
+
     let conn = establish_connection();
 
-    use schema::initiatives::dsl::*;
+    while {
+        initiative.name = random_id(&old_name);
 
-    let count = diesel::insert_or_ignore_into(initiatives)
-        .values(&*initiative)
-        .execute(&conn)
-        .unwrap();
+        use schema::initiatives::dsl::*;
+        let count = diesel::insert_or_ignore_into(initiatives)
+            .values(&*initiative)
+            .execute(&conn)
+            .unwrap();
 
-    if count == 1 {
-        let support = InitiativeSupport {
-            initiative_commitment: initiative.commitment.clone(),
-            initiative_name: initiative.name.clone(),
-        };
+        count == 0
+    } {}
 
-        initiative_support_add(auth, Form::from(support));
+    let support = InitiativeSupport {
+        initiative_commitment: initiative.commitment.clone(),
+        initiative_name: initiative.name.clone(),
+    };
 
-        Status::Created
-    } else {
-        Status::Conflict
-    }
+    initiative_support_add(auth, Form::from(support));
+
+    Status::Created
 }
 
-#[post("/initiative/<commitment_name>/<initiative_name>")]
+#[get("/initiative/<commitment_name>/<initiative_name>")]
 fn initiative(
     _auth: UserAuth,
     commitment_name: &str,

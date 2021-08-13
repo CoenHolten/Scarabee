@@ -41,6 +41,7 @@ pub struct InitiativeSupport {
 
 #[derive(Queryable, FromForm, Insertable, Associations, Identifiable, AsChangeset, Serialize)]
 #[belongs_to(Commitment, foreign_key = "commitment")]
+#[belongs_to(User, foreign_key = "user")]
 #[primary_key(commitment, name)]
 pub struct Initiative {
     pub commitment: String,

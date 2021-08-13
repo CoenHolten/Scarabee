@@ -1,4 +1,5 @@
 use blake2::{Blake2s, Digest};
+use rand::{thread_rng, Rng};
 use rocket::{
     request::{self, FromRequest},
     Request,
@@ -38,4 +39,10 @@ impl<'r> FromRequest<'r> for UserAuth {
         let username = username.as_ref().unwrap().value();
         request::Outcome::Success(UserAuth(username.to_string()))
     }
+}
+
+pub fn random_id(name: &str) -> String {
+    let mut rng = thread_rng();
+    let num = rng.gen_range(0..10000);
+    format!("{}#{:04}", name, num)
 }
