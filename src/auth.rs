@@ -46,3 +46,6 @@ pub fn random_id(name: &str) -> String {
     let num = rng.gen_range(0..10000);
     format!("{}#{:04}", name, num)
 }
+
+#[database("3ways_db")]
+pub struct DbConn(diesel::MysqlConnection);
