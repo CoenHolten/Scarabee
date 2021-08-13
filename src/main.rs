@@ -5,6 +5,8 @@ extern crate dotenv;
 extern crate rocket;
 extern crate blake2;
 extern crate hex;
+#[macro_use]
+extern crate serde;
 
 mod auth;
 mod connection;
@@ -20,6 +22,7 @@ use rocket::form::Form;
 use rocket::http::Cookie;
 use rocket::http::CookieJar;
 use rocket::http::Status;
+use rocket::response::content;
 
 use crate::auth::UserAuth;
 use crate::models::Commitment;
@@ -95,6 +98,21 @@ fn user_logout(cookies: &CookieJar<'_>) -> Status {
     Status::Ok
 }
 
+#[post("/user/<user_name>")]
+fn user(_auth: UserAuth, user_name: &str) -> Result<content::Json<String>, Status> {
+    let conn = establish_connection();
+
+    use schema::users::dsl::*;
+
+    let item = users.find(user_name).get_result::<User>(&conn);
+
+    if let Ok(user) = item {
+        Ok(content::Json(serde_json::to_string(&user).unwrap()))
+    } else {
+        Err(Status::NotFound)
+    }
+}
+
 #[post("/commitment_new", data = "<commitment>")]
 fn commitment_new(commitment: Form<Commitment>) -> Status {
     let conn = establish_connection();
@@ -110,6 +128,23 @@ fn commitment_new(commitment: Form<Commitment>) -> Status {
         Status::Created
     } else {
         Status::Conflict
+    }
+}
+
+#[post("/commitment/<commitment_name>")]
+fn commitment(_auth: UserAuth, commitment_name: &str) -> Result<content::Json<String>, Status> {
+    let conn = establish_connection();
+
+    use schema::commitments::dsl::*;
+
+    let item = commitments
+        .find(commitment_name)
+        .get_result::<Commitment>(&conn);
+
+    if let Ok(commitment) = item {
+        Ok(content::Json(serde_json::to_string(&commitment).unwrap()))
+    } else {
+        Err(Status::NotFound)
     }
 }
 
@@ -142,23 +177,42 @@ fn initiative_new(auth: UserAuth, initiative: Form<Initiative>) -> Status {
     }
 }
 
-#[post("/initiative_new", data = "<initiative>")]
-fn initiative_edit(auth: UserAuth, initiative: Form<Initiative>) -> Status {
+#[post("/initiative/<commitment_name>/<initiative_name>")]
+fn initiative(
+    _auth: UserAuth,
+    commitment_name: &str,
+    initiative_name: &str,
+) -> Result<content::Json<String>, Status> {
     let conn = establish_connection();
 
     use schema::initiatives::dsl::*;
 
-    let count = diesel::update(&*initiative)
-        .set(&*initiative)
-        .execute(&conn)
-        .unwrap();
+    let item = initiatives
+        .find((commitment_name, initiative_name))
+        .get_result::<Initiative>(&conn);
 
-    if count == 1 {
-        Status::Ok
+    if let Ok(initiative) = item {
+        Ok(content::Json(serde_json::to_string(&initiative).unwrap()))
     } else {
-        Status::NotFound
+        Err(Status::NotFound)
     }
 }
+
+// #[post("/initiative_edit", data = "<initiative>")]
+// fn initiative_edit(auth: UserAuth, initiative: Form<Initiative>) -> Status {
+//     let conn = establish_connection();
+
+//     let count = diesel::update(&*initiative)
+//         .set(&*initiative)
+//         .execute(&conn)
+//         .unwrap();
+
+//     if count == 1 {
+//         Status::Ok
+//     } else {
+//         Status::NotFound
+//     }
+// }
 
 #[post("/initiative_support_add", data = "<support>")]
 fn initiative_support_add(auth: UserAuth, support: Form<InitiativeSupport>) {
@@ -192,6 +246,18 @@ fn rocket() -> _ {
 
     rocket::build().mount(
         "/",
-        routes![user_new, user_edit, user_login, user_logout, commitment_new],
+        routes![
+            user_new,
+            user_edit,
+            user_login,
+            user_logout,
+            user,
+            commitment_new,
+            commitment,
+            initiative_new,
+            initiative,
+            initiative_support_add,
+            initiative_support_remove
+        ],
     )
 }

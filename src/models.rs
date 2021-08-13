@@ -1,6 +1,6 @@
 use super::schema::*;
 
-#[derive(Queryable, FromForm, Insertable, Identifiable, AsChangeset)]
+#[derive(Queryable, FromForm, Insertable, Identifiable, AsChangeset, Serialize)]
 #[primary_key(name)]
 pub struct User {
     pub name: String,
@@ -17,7 +17,7 @@ pub struct UserLogin {
     pub password: String, // this is a hash
 }
 
-#[derive(Queryable, FromForm, Insertable, Identifiable)]
+#[derive(Queryable, FromForm, Insertable, Identifiable, Serialize)]
 #[primary_key(name)]
 pub struct Commitment {
     pub name: String,
@@ -39,7 +39,7 @@ pub struct InitiativeSupport {
     pub initiative_name: String,
 }
 
-#[derive(Queryable, FromForm, Insertable, Associations, Identifiable, AsChangeset)]
+#[derive(Queryable, FromForm, Insertable, Associations, Identifiable, AsChangeset, Serialize)]
 #[belongs_to(Commitment, foreign_key = "commitment")]
 #[primary_key(commitment, name)]
 pub struct Initiative {

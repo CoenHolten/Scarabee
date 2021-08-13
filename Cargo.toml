@@ -11,3 +11,5 @@ dotenv = "0.15.0"
 rocket = { version = "0.5.0-rc.1", features = ["secrets", "tls", "json"] }
 blake2 = "0.9.1"
 hex = "0.4.3"
+serde = "1.0.127"
+serde_json = "1.0.66"

@@ -1279,6 +1279,8 @@ dependencies = [
  "dotenv",
  "hex",
  "rocket",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
