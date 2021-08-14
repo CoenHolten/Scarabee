@@ -9,7 +9,6 @@ table! {
     commitments (name) {
         name -> Varchar,
         description -> Text,
-        is_concept -> Tinyint,
     }
 }
 
@@ -26,7 +25,7 @@ table! {
         commitment -> Varchar,
         name -> Varchar,
         description -> Text,
-        user -> Nullable<Varchar>,
+        carer -> Nullable<Varchar>,
     }
 }
 
@@ -43,7 +42,7 @@ joinable!(commitment_supports -> commitments (commitment));
 joinable!(commitment_supports -> users (user));
 joinable!(initiative_supports -> users (user));
 joinable!(initiatives -> commitments (commitment));
-joinable!(initiatives -> users (user));
+joinable!(initiatives -> users (carer));
 
 allow_tables_to_appear_in_same_query!(
     commitment_supports,

@@ -10,18 +10,22 @@ use crate::models::{User, UserLogin};
 impl User {
     pub fn hash_password(&mut self) {
         let name = self.name.as_bytes();
-        let mut hasher = Blake2s::with_params(&[], name, &[]);
+        let len = name.len().min(8);
+        let mut hasher = Blake2s::with_params(&[], &name[..len], &[]);
         hasher.update(&self.password);
         self.password = hex::encode(hasher.finalize());
+        println!("{}", &self.password);
     }
 }
 
 impl UserLogin {
     pub fn hash_password(&mut self) {
         let name = self.name.as_bytes();
-        let mut hasher = Blake2s::with_params(&[], name, &[]);
+        let len = name.len().min(8);
+        let mut hasher = Blake2s::with_params(&[], &name[..len], &[]);
         hasher.update(&self.password);
         self.password = hex::encode(hasher.finalize());
+        println!("{}", &self.password);
     }
 }
 

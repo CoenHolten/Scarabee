@@ -19,8 +19,8 @@ USE `3ways_db` ;
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `3ways_db`.`users` (
   `name` VARCHAR(45) NOT NULL,
-  `password` VARCHAR(45) NOT NULL,
-  `email` VARCHAR(45) NOT NULL,
+  `password` VARCHAR(64) NOT NULL,
+  `email` VARCHAR(64) NOT NULL,
   `phone` VARCHAR(16) NOT NULL DEFAULT '',
   PRIMARY KEY (`name`));
 
@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS `3ways_db`.`users` (
 CREATE TABLE IF NOT EXISTS `3ways_db`.`commitments` (
   `name` VARCHAR(45) NOT NULL,
   `description` TEXT NOT NULL,
-  `is_concept` TINYINT NOT NULL,
   PRIMARY KEY (`name`))
 ENGINE = InnoDB;
 
@@ -43,17 +42,17 @@ CREATE TABLE IF NOT EXISTS `3ways_db`.`initiatives` (
   `commitment` VARCHAR(45) NOT NULL,
   `name` VARCHAR(45) NOT NULL,
   `description` TEXT NOT NULL,
-  `user` VARCHAR(45) NULL,
+  `carer` VARCHAR(45) NULL,
   PRIMARY KEY (`commitment`, `name`),
   INDEX `fk_initiatives_commitments_idx` (`commitment` ASC) VISIBLE,
-  INDEX `fk_initiatives_users_idx` (`user` ASC) VISIBLE,
+  INDEX `fk_initiatives_users_idx` (`carer` ASC) VISIBLE,
   CONSTRAINT `fk_initiatives_commitments`
     FOREIGN KEY (`commitment`)
     REFERENCES `3ways_db`.`commitments` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_initiatives_users`
-    FOREIGN KEY (`user`)
+    FOREIGN KEY (`carer`)
     REFERENCES `3ways_db`.`users` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)

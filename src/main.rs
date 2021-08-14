@@ -35,28 +35,28 @@ use models::UserLogin;
 use models::User;
 
 #[post("/user_new", data = "<user>")]
-async fn user_new(user: Form<User>, conn: DbConn, cookies: &CookieJar<'_>) -> Status {
-    while {
-        let mut new_user = user.clone();
-        new_user.name = random_id(&user.name);
-        new_user.hash_password();
+async fn user_new(user: Form<User>, conn: DbConn, cookies: &CookieJar<'_>) -> String {
+    let name = conn
+        .run(move |c| loop {
+            let mut new_user = user.clone();
+            new_user.name = random_id(&user.name);
+            new_user.hash_password();
 
-        let count = conn
-            .run(move |c| {
-                use schema::users::dsl::*;
+            use schema::users::dsl::*;
+            let count = diesel::insert_or_ignore_into(users)
+                .values(&new_user)
+                .execute(c)
+                .unwrap();
 
-                diesel::insert_or_ignore_into(users)
-                    .values(&new_user)
-                    .execute(c)
-                    .unwrap()
-            })
-            .await;
+            if count == 1 {
+                break new_user.name;
+            }
+        })
+        .await;
 
-        count == 0
-    } {}
+    cookies.add_private(Cookie::new("name", name.clone()));
 
-    cookies.add_private(Cookie::new("name", user.name.clone()));
-    Status::Created
+    name
 }
 
 #[post("/user_edit", data = "<user>")]
@@ -124,30 +124,28 @@ async fn user(
     if let Ok(user) = item {
         Ok(content::Json(serde_json::to_string(&user).unwrap()))
     } else {
+        println!("{:?}", item.err().unwrap());
         Err(Status::NotFound)
     }
 }
 
 #[post("/commitment_new", data = "<commitment>")]
-async fn commitment_new(_auth: UserAuth, conn: DbConn, commitment: Form<Commitment>) -> Status {
-    while {
+async fn commitment_new(_auth: UserAuth, conn: DbConn, commitment: Form<Commitment>) -> String {
+    conn.run(move |c| loop {
         let mut new_commitment = commitment.clone();
         new_commitment.name = random_id(&commitment.name);
 
-        let count = conn
-            .run(move |c| {
-                use schema::commitments::dsl::*;
-                diesel::insert_or_ignore_into(commitments)
-                    .values(&new_commitment)
-                    .execute(c)
-                    .unwrap()
-            })
-            .await;
+        use schema::commitments::dsl::*;
+        let count = diesel::insert_or_ignore_into(commitments)
+            .values(&new_commitment)
+            .execute(c)
+            .unwrap();
 
-        count == 0
-    } {}
-
-    Status::Created
+        if count == 1 {
+            break new_commitment.name;
+        }
+    })
+    .await
 }
 
 #[get("/commitment/<commitment_name>")]
@@ -173,36 +171,41 @@ async fn commitment(
 }
 
 #[post("/initiative_new", data = "<initiative>")]
-async fn initiative_new(auth: UserAuth, conn: DbConn, initiative: Form<Initiative>) -> Status {
-    if initiative.user.is_some() && initiative.user.as_ref().unwrap() != &auth.0 {
-        return Status::Unauthorized;
+async fn initiative_new(
+    auth: UserAuth,
+    conn: DbConn,
+    initiative: Form<Initiative>,
+) -> Result<String, Status> {
+    if initiative.carer.is_some() && initiative.carer.as_ref().unwrap() != &auth.0 {
+        return Err(Status::Unauthorized);
     }
 
-    while {
-        let mut new_initiative = initiative.clone();
-        new_initiative.name = random_id(&initiative.name);
+    let commitment_name = initiative.commitment.clone();
+    let initiative_name = conn
+        .run(move |c| loop {
+            let mut new_initiative = initiative.clone();
+            new_initiative.name = random_id(&initiative.name);
 
-        let count = conn
-            .run(move |c| {
-                use schema::initiatives::dsl::*;
-                diesel::insert_or_ignore_into(initiatives)
-                    .values(&new_initiative)
-                    .execute(c)
-                    .unwrap()
-            })
-            .await;
+            use schema::initiatives::dsl::*;
+            let count = diesel::insert_or_ignore_into(initiatives)
+                .values(&new_initiative)
+                .execute(c)
+                .unwrap();
 
-        count == 0
-    } {}
+            if count == 1 {
+                break new_initiative.name;
+            }
+        })
+        .await;
 
     let support = InitiativeSupport {
-        initiative_commitment: initiative.commitment.clone(),
-        initiative_name: initiative.name.clone(),
+        initiative_commitment: commitment_name,
+        initiative_name: initiative_name.clone(),
     };
 
     initiative_support_add(auth, conn, Form::from(support)).await;
 
-    Status::Created
+    Ok(initiative_name)
 }
 
 #[get("/initiative/<commitment_name>/<initiative_name>")]
@@ -272,6 +275,8 @@ async fn initiative_support_remove(auth: UserAuth, conn: DbConn, support: Form<I
 
 #[launch]
 fn rocket() -> _ {
+    dotenv::dotenv().ok();
+
     rocket::build()
         .mount(
             "/",
