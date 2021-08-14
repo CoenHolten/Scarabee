@@ -114,6 +114,7 @@ async fn user(
     conn: DbConn,
     user_name: String,
 ) -> Result<content::Json<String>, Status> {
+    println!("{}", &user_name);
     let item = conn
         .run(move |c| {
             use schema::users::dsl::*;
@@ -130,22 +131,38 @@ async fn user(
 }
 
 #[post("/commitment_new", data = "<commitment>")]
-async fn commitment_new(_auth: UserAuth, conn: DbConn, commitment: Form<Commitment>) -> String {
-    conn.run(move |c| loop {
-        let mut new_commitment = commitment.clone();
-        new_commitment.name = random_id(&commitment.name);
+async fn commitment_new(auth: UserAuth, conn: DbConn, commitment: Form<Commitment>) -> String {
+    let commitment_name = conn
+        .run(move |c| loop {
+            let mut new_commitment = commitment.clone();
+            new_commitment.name = random_id(&commitment.name);
 
-        use schema::commitments::dsl::*;
-        let count = diesel::insert_or_ignore_into(commitments)
-            .values(&new_commitment)
-            .execute(c)
-            .unwrap();
+            use schema::commitments::dsl::*;
+            let count = diesel::insert_or_ignore_into(commitments)
+                .values(&new_commitment)
+                .execute(c)
+                .unwrap();
 
-        if count == 1 {
-            break new_commitment.name;
-        }
-    })
-    .await
+            if count == 1 {
+                break new_commitment.name;
+            }
+        })
+        .await;
+
+    let initiative = Initiative {
+        commitment: commitment_name.clone(),
+        name: "Commitment Writer".to_string(),
+        description:
+            "Wrote the commitment. This Initiative initially keeps the commitment in existence."
+                .to_string(),
+        carer: Some(auth.0.clone()),
+    };
+
+    initiative_new(auth, conn, Form::from(initiative))
+        .await
+        .unwrap();
+
+    commitment_name
 }
 
 #[get("/commitment/<commitment_name>")]
@@ -230,22 +247,6 @@ async fn initiative(
         Err(Status::NotFound)
     }
 }
-
-// #[post("/initiative_edit", data = "<initiative>")]
-// fn initiative_edit(auth: UserAuth, initiative: Form<Initiative>) -> Status {
-//     let conn = establish_connection();
-
-//     let count = diesel::update(&*initiative)
-//         .set(&*initiative)
-//         .execute(&conn)
-//         .unwrap();
-
-//     if count == 1 {
-//         Status::Ok
-//     } else {
-//         Status::NotFound
-//     }
-// }
 
 #[post("/initiative_support_add", data = "<support>")]
 async fn initiative_support_add(auth: UserAuth, conn: DbConn, support: Form<InitiativeSupport>) {

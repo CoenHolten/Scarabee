@@ -14,7 +14,6 @@ impl User {
         let mut hasher = Blake2s::with_params(&[], &name[..len], &[]);
         hasher.update(&self.password);
         self.password = hex::encode(hasher.finalize());
-        println!("{}", &self.password);
     }
 }
 
@@ -25,7 +24,6 @@ impl UserLogin {
         let mut hasher = Blake2s::with_params(&[], &name[..len], &[]);
         hasher.update(&self.password);
         self.password = hex::encode(hasher.finalize());
-        println!("{}", &self.password);
     }
 }
 
