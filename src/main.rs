@@ -18,6 +18,7 @@ use diesel::ExpressionMethods;
 use diesel::OptionalExtension;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
+use diesel::TextExpressionMethods;
 use rocket::form::Form;
 use rocket::http::Cookie;
 use rocket::http::CookieJar;
@@ -187,6 +188,22 @@ async fn commitment(
     }
 }
 
+#[get("/commitment_list/<keyword>")]
+async fn commitment_list(_auth: UserAuth, conn: DbConn, keyword: String) -> content::Json<String> {
+    let items = conn
+        .run(move |c| {
+            use schema::commitments::dsl::*;
+            commitments
+                .filter(name.like(&keyword))
+                .select(name)
+                .load::<String>(c)
+                .unwrap()
+        })
+        .await;
+
+    content::Json(serde_json::to_string(&items).unwrap())
+}
+
 #[post("/initiative_new", data = "<initiative>")]
 async fn initiative_new(
     auth: UserAuth,
@@ -220,7 +237,7 @@ async fn initiative_new(
         initiative_name: initiative_name.clone(),
     };
 
-    initiative_support_add(auth, conn, Form::from(support)).await;
+    support_add(auth, conn, Form::from(support)).await;
 
     Ok(initiative_name)
 }
@@ -248,8 +265,30 @@ async fn initiative(
     }
 }
 
-#[post("/initiative_support_add", data = "<support>")]
-async fn initiative_support_add(auth: UserAuth, conn: DbConn, support: Form<InitiativeSupport>) {
+#[get("/initiative_list/<commitment_name>/<keyword>")]
+async fn initiative_list(
+    _auth: UserAuth,
+    conn: DbConn,
+    commitment_name: String,
+    keyword: String,
+) -> content::Json<String> {
+    let items = conn
+        .run(move |c| {
+            use schema::initiatives::dsl::*;
+            initiatives
+                .filter(commitment.eq(&commitment_name))
+                .filter(name.like(&keyword))
+                .select(name)
+                .load::<String>(c)
+                .unwrap()
+        })
+        .await;
+
+    content::Json(serde_json::to_string(&items).unwrap())
+}
+
+#[post("/support_add", data = "<support>")]
+async fn support_add(auth: UserAuth, conn: DbConn, support: Form<InitiativeSupport>) {
     conn.run(move |c| {
         use schema::initiative_supports::dsl::*;
         diesel::insert_or_ignore_into(initiative_supports)
@@ -260,8 +299,8 @@ async fn initiative_support_add(auth: UserAuth, conn: DbConn, support: Form<Init
     .await;
 }
 
-#[post("/initiative_support_remove", data = "<support>")]
-async fn initiative_support_remove(auth: UserAuth, conn: DbConn, support: Form<InitiativeSupport>) {
+#[post("/support_remove", data = "<support>")]
+async fn support_remove(auth: UserAuth, conn: DbConn, support: Form<InitiativeSupport>) {
     conn.run(move |c| {
         use schema::initiative_supports::dsl::*;
         diesel::delete(initiative_supports)
@@ -272,6 +311,30 @@ async fn initiative_support_remove(auth: UserAuth, conn: DbConn, support: Form<I
             .unwrap()
     })
     .await;
+}
+
+#[get("/support_list/<commitment>/<initiative>/<keyword>")]
+async fn support_list(
+    _auth: UserAuth,
+    conn: DbConn,
+    commitment: String,
+    initiative: String,
+    keyword: String,
+) -> content::Json<String> {
+    let items = conn
+        .run(move |c| {
+            use schema::initiative_supports::dsl::*;
+            initiative_supports
+                .filter(initiative_commitment.eq(&commitment))
+                .filter(initiative_name.eq(&initiative))
+                .filter(user.like(&keyword))
+                .select(user)
+                .load::<String>(c)
+                .unwrap()
+        })
+        .await;
+
+    content::Json(serde_json::to_string(&items).unwrap())
 }
 
 #[launch]
@@ -289,10 +352,13 @@ fn rocket() -> _ {
                 user,
                 commitment_new,
                 commitment,
+                commitment_list,
                 initiative_new,
                 initiative,
-                initiative_support_add,
-                initiative_support_remove
+                initiative_list,
+                support_add,
+                support_remove,
+                support_list,
             ],
         )
         .attach(DbConn::fairing())
