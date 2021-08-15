@@ -15,6 +15,7 @@ mod models;
 mod schema;
 
 use chrono::NaiveDateTime;
+use diesel::dsl::now;
 use diesel::ExpressionMethods;
 use diesel::OptionalExtension;
 use diesel::QueryDsl;
@@ -33,11 +34,10 @@ use crate::auth::UserAuth;
 use crate::models::Commitment;
 use crate::models::Initiative;
 use crate::models::Search;
-use crate::models::Support;
 use crate::models::User;
 use crate::models::UserLogin;
 
-#[post("/user_new", data = "<user>")]
+#[put("/user_new", data = "<user>")]
 async fn user_new(user: Form<User>, conn: DbConn, cookies: &CookieJar<'_>) -> Status {
     let mut new_user = user.clone();
     new_user.hash_password();
@@ -60,7 +60,7 @@ async fn user_new(user: Form<User>, conn: DbConn, cookies: &CookieJar<'_>) -> St
     }
 }
 
-#[post("/user_edit", data = "<user>")]
+#[put("/user_edit", data = "<user>")]
 async fn user_edit(auth: UserAuth, conn: DbConn, mut user: Form<User>) -> Status {
     if auth.0 != user.name {
         return Status::Unauthorized;
@@ -75,7 +75,7 @@ async fn user_edit(auth: UserAuth, conn: DbConn, mut user: Form<User>) -> Status
     Status::Ok
 }
 
-#[post("/user_login", data = "<user>")]
+#[get("/user_login", data = "<user>")]
 async fn user_login(mut user: Form<UserLogin>, conn: DbConn, cookies: &CookieJar<'_>) -> Status {
     user.hash_password();
 
@@ -103,7 +103,7 @@ async fn user_login(mut user: Form<UserLogin>, conn: DbConn, cookies: &CookieJar
     }
 }
 
-#[post("/user_logout")]
+#[get("/user_logout")]
 fn user_logout(cookies: &CookieJar<'_>) -> Status {
     cookies.remove_private(Cookie::named("name"));
     Status::Ok
@@ -219,11 +219,7 @@ async fn initiative_new(
         })
         .await;
 
-    let support = Support {
-        initiative_name: initiative_name.clone(),
-    };
-
-    support_add(auth, conn, Form::from(support)).await;
+    support_add(auth, conn, initiative_name.clone()).await;
 
     Ok(initiative_name)
 }
@@ -260,25 +256,41 @@ async fn initiative_search(
     content::Json(serde_json::to_string(&items).unwrap())
 }
 
-#[post("/support_add", data = "<support>")]
-async fn support_add(auth: UserAuth, conn: DbConn, support: Form<Support>) {
+#[put("/support_add/<initiative>")]
+async fn support_add(auth: UserAuth, conn: DbConn, initiative: String) {
     conn.run(move |c| {
         use schema::supports::dsl::*;
         diesel::insert_or_ignore_into(supports)
-            .values((user_name.eq(&auth.0), &*support))
+            .values((user_name.eq(&auth.0), initiative_name.eq(&initiative)))
             .execute(c)
             .unwrap()
     })
     .await;
 }
 
-#[post("/support_remove", data = "<support>")]
-async fn support_remove(auth: UserAuth, conn: DbConn, support: Form<Support>) {
+#[put("/support_adopt/<initiative>")]
+async fn support_adopt(auth: UserAuth, conn: DbConn, initiative: String) {
+    conn.run(move |c| {
+        use schema::supports::dsl::*;
+        diesel::insert_or_ignore_into(supports)
+            .values((
+                user_name.eq(&auth.0),
+                initiative_name.eq(&initiative),
+                adopt_since.eq(now),
+            ))
+            .execute(c)
+            .unwrap()
+    })
+    .await;
+}
+
+#[put("/support_remove/<initiative>")]
+async fn support_remove(auth: UserAuth, conn: DbConn, initiative: String) {
     conn.run(move |c| {
         use schema::supports::dsl::*;
         diesel::delete(supports)
             .filter(user_name.eq(&auth.0))
-            .filter(initiative_name.eq(&support.initiative_name))
+            .filter(initiative_name.eq(&initiative))
             .execute(c)
             .unwrap()
     })
@@ -340,6 +352,7 @@ fn rocket() -> _ {
                 initiative,
                 initiative_search,
                 support_add,
+                support_adopt,
                 support_remove,
                 support,
                 support_search,

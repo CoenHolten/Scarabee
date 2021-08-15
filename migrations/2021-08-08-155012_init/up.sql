@@ -58,7 +58,7 @@ ENGINE = InnoDB;
 CREATE TABLE IF NOT EXISTS `3ways_db`.`supports` (
   `user_name` VARCHAR(45) NOT NULL,
   `initiative_name` VARCHAR(45) NOT NULL,
-  `adopt_since` DATETIME NULL,
+  `adopt_since` TIMESTAMP NULL,
   PRIMARY KEY (`user_name`, `initiative_name`),
   INDEX `fk_supports_initiatives_idx` (`initiative_name` ASC) INVISIBLE,
   CONSTRAINT `fk_supports_users`

@@ -26,11 +26,6 @@ pub struct Commitment {
     pub description: String,
 }
 
-#[derive(FromForm, Insertable)]
-pub struct Support {
-    pub initiative_name: String,
-}
-
 #[derive(
     Queryable, FromForm, Insertable, Associations, Identifiable, AsChangeset, Serialize, Clone,
 )]

@@ -17,7 +17,7 @@ table! {
     supports (user_name, initiative_name) {
         user_name -> Varchar,
         initiative_name -> Varchar,
-        adopt_since -> Nullable<Datetime>,
+        adopt_since -> Nullable<Timestamp>,
     }
 }
 
