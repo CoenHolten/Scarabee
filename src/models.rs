@@ -27,7 +27,7 @@ pub struct Commitment {
 }
 
 #[derive(FromForm, Insertable)]
-pub struct InitiativeSupport {
+pub struct Support {
     pub initiative_commitment: String,
     pub initiative_name: String,
 }
@@ -36,12 +36,18 @@ pub struct InitiativeSupport {
     Queryable, FromForm, Insertable, Associations, Identifiable, AsChangeset, Serialize, Clone,
 )]
 #[belongs_to(Commitment, foreign_key = "commitment")]
-#[belongs_to(User, foreign_key = "carer")]
 #[primary_key(commitment, name)]
 pub struct Initiative {
     pub commitment: String,
     #[field(validate = len(..=40))]
     pub name: String,
     pub description: String,
-    pub carer: Option<String>,
+}
+
+#[derive(FromForm, Clone)]
+pub struct Search {
+    pub supporter: Option<String>,
+    pub is_adopter: Option<bool>,
+    pub commitment: Option<String>,
+    pub initiative: Option<String>,
 }

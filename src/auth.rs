@@ -1,11 +1,18 @@
 use blake2::{Blake2s, Digest};
+use diesel::BoolExpressionMethods;
+use diesel::Expression;
+use diesel::ExpressionMethods;
+use diesel::JoinOnDsl;
+use diesel::QueryDsl;
+use diesel::RunQueryDsl;
+use diesel::TextExpressionMethods;
 use rand::{thread_rng, Rng};
 use rocket::{
     request::{self, FromRequest},
     Request,
 };
 
-use crate::models::{User, UserLogin};
+use crate::models::{Search, User, UserLogin};
 
 impl User {
     pub fn hash_password(&mut self) {
@@ -51,3 +58,44 @@ pub fn random_id(name: &str) -> String {
 
 #[database("3ways_db")]
 pub struct DbConn(diesel::MysqlConnection);
+
+pub enum Column {
+    Initiative,
+    Support,
+    Commitment,
+}
+
+pub async fn search_db(conn: DbConn, search: Search, column: Column) -> Vec<String> {
+    fn to_filter(option: &Option<String>) -> &str {
+        option.as_ref().map(String::as_str).unwrap_or("%")
+    }
+
+    conn.run(move |c| {
+        use crate::schema::initiatives::dsl::*;
+        use crate::schema::supports::dsl::*;
+        let combined = initiatives.inner_join(
+            supports.on(initiative_commitment
+                .eq(commitment)
+                .and(initiative_name.eq(name))),
+        );
+        let filtered = combined
+            .filter(user.like(to_filter(&search.supporter)))
+            .filter(commitment.like(to_filter(&search.commitment)))
+            .filter(initiative_name.like(to_filter(&search.initiative)));
+
+        match column {
+            Column::Initiative => filtered
+                .select(initiative_name)
+                .distinct()
+                .load::<String>(c)
+                .unwrap(),
+            Column::Support => filtered.select(user).distinct().load::<String>(c).unwrap(),
+            Column::Commitment => filtered
+                .select(commitment)
+                .distinct()
+                .load::<String>(c)
+                .unwrap(),
+        }
+    })
+    .await
+}

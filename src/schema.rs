@@ -1,22 +1,7 @@
 table! {
-    commitment_supports (user, commitment) {
-        user -> Varchar,
-        commitment -> Varchar,
-    }
-}
-
-table! {
     commitments (name) {
         name -> Varchar,
         description -> Text,
-    }
-}
-
-table! {
-    initiative_supports (user, initiative_commitment, initiative_name) {
-        user -> Varchar,
-        initiative_commitment -> Varchar,
-        initiative_name -> Varchar,
     }
 }
 
@@ -25,7 +10,15 @@ table! {
         commitment -> Varchar,
         name -> Varchar,
         description -> Text,
-        carer -> Nullable<Varchar>,
+    }
+}
+
+table! {
+    supports (user, initiative_commitment, initiative_name) {
+        user -> Varchar,
+        initiative_commitment -> Varchar,
+        initiative_name -> Varchar,
+        adopt_since -> Nullable<Datetime>,
     }
 }
 
@@ -38,16 +31,7 @@ table! {
     }
 }
 
-joinable!(commitment_supports -> commitments (commitment));
-joinable!(commitment_supports -> users (user));
-joinable!(initiative_supports -> users (user));
 joinable!(initiatives -> commitments (commitment));
-joinable!(initiatives -> users (carer));
+joinable!(supports -> users (user));
 
-allow_tables_to_appear_in_same_query!(
-    commitment_supports,
-    commitments,
-    initiative_supports,
-    initiatives,
-    users,
-);
+allow_tables_to_appear_in_same_query!(commitments, initiatives, supports, users,);

@@ -30,10 +30,14 @@ use auth::DbConn;
 use auth::UserAuth;
 use models::Commitment;
 use models::Initiative;
-use models::InitiativeSupport;
+use models::Support;
 use models::UserLogin;
 
 use models::User;
+
+use crate::auth::search_db;
+use crate::auth::Column;
+use crate::models::Search;
 
 #[post("/user_new", data = "<user>")]
 async fn user_new(user: Form<User>, conn: DbConn, cookies: &CookieJar<'_>) -> String {
@@ -156,7 +160,6 @@ async fn commitment_new(auth: UserAuth, conn: DbConn, commitment: Form<Commitmen
         description:
             "Wrote the commitment. This Initiative initially keeps the commitment in existence."
                 .to_string(),
-        carer: Some(auth.0.clone()),
     };
 
     initiative_new(auth, conn, Form::from(initiative))
@@ -188,19 +191,13 @@ async fn commitment(
     }
 }
 
-#[get("/commitment_list/<keyword>")]
-async fn commitment_list(_auth: UserAuth, conn: DbConn, keyword: String) -> content::Json<String> {
-    let items = conn
-        .run(move |c| {
-            use schema::commitments::dsl::*;
-            commitments
-                .filter(name.like(&keyword))
-                .select(name)
-                .load::<String>(c)
-                .unwrap()
-        })
-        .await;
-
+#[get("/commitment_search", data = "<search>")]
+async fn commitment_search(
+    _auth: UserAuth,
+    conn: DbConn,
+    search: Form<Search>,
+) -> content::Json<String> {
+    let items = search_db(conn, search.clone(), Column::Commitment).await;
     content::Json(serde_json::to_string(&items).unwrap())
 }
 
@@ -210,10 +207,6 @@ async fn initiative_new(
     conn: DbConn,
     initiative: Form<Initiative>,
 ) -> Result<String, Status> {
-    if initiative.carer.is_some() && initiative.carer.as_ref().unwrap() != &auth.0 {
-        return Err(Status::Unauthorized);
-    }
-
     let commitment_name = initiative.commitment.clone();
     let initiative_name = conn
         .run(move |c| loop {
@@ -232,7 +225,7 @@ async fn initiative_new(
         })
         .await;
 
-    let support = InitiativeSupport {
+    let support = Support {
         initiative_commitment: commitment_name,
         initiative_name: initiative_name.clone(),
     };
@@ -265,33 +258,21 @@ async fn initiative(
     }
 }
 
-#[get("/initiative_list/<commitment_name>/<keyword>")]
-async fn initiative_list(
+#[get("/initiative_search", data = "<search>")]
+async fn initiative_search(
     _auth: UserAuth,
     conn: DbConn,
-    commitment_name: String,
-    keyword: String,
+    search: Form<Search>,
 ) -> content::Json<String> {
-    let items = conn
-        .run(move |c| {
-            use schema::initiatives::dsl::*;
-            initiatives
-                .filter(commitment.eq(&commitment_name))
-                .filter(name.like(&keyword))
-                .select(name)
-                .load::<String>(c)
-                .unwrap()
-        })
-        .await;
-
+    let items = search_db(conn, search.clone(), Column::Initiative).await;
     content::Json(serde_json::to_string(&items).unwrap())
 }
 
 #[post("/support_add", data = "<support>")]
-async fn support_add(auth: UserAuth, conn: DbConn, support: Form<InitiativeSupport>) {
+async fn support_add(auth: UserAuth, conn: DbConn, support: Form<Support>) {
     conn.run(move |c| {
-        use schema::initiative_supports::dsl::*;
-        diesel::insert_or_ignore_into(initiative_supports)
+        use schema::supports::dsl::*;
+        diesel::insert_or_ignore_into(supports)
             .values((user.eq(&auth.0), &*support))
             .execute(c)
             .unwrap()
@@ -300,10 +281,10 @@ async fn support_add(auth: UserAuth, conn: DbConn, support: Form<InitiativeSuppo
 }
 
 #[post("/support_remove", data = "<support>")]
-async fn support_remove(auth: UserAuth, conn: DbConn, support: Form<InitiativeSupport>) {
+async fn support_remove(auth: UserAuth, conn: DbConn, support: Form<Support>) {
     conn.run(move |c| {
-        use schema::initiative_supports::dsl::*;
-        diesel::delete(initiative_supports)
+        use schema::supports::dsl::*;
+        diesel::delete(supports)
             .filter(user.eq(&auth.0))
             .filter(initiative_commitment.eq(&support.initiative_commitment))
             .filter(initiative_name.eq(&support.initiative_name))
@@ -313,27 +294,13 @@ async fn support_remove(auth: UserAuth, conn: DbConn, support: Form<InitiativeSu
     .await;
 }
 
-#[get("/support_list/<commitment>/<initiative>/<keyword>")]
-async fn support_list(
+#[get("/support_search", data = "<search>")]
+async fn support_search(
     _auth: UserAuth,
     conn: DbConn,
-    commitment: String,
-    initiative: String,
-    keyword: String,
+    search: Form<Search>,
 ) -> content::Json<String> {
-    let items = conn
-        .run(move |c| {
-            use schema::initiative_supports::dsl::*;
-            initiative_supports
-                .filter(initiative_commitment.eq(&commitment))
-                .filter(initiative_name.eq(&initiative))
-                .filter(user.like(&keyword))
-                .select(user)
-                .load::<String>(c)
-                .unwrap()
-        })
-        .await;
-
+    let items = search_db(conn, search.clone(), Column::Support).await;
     content::Json(serde_json::to_string(&items).unwrap())
 }
 
@@ -352,13 +319,13 @@ fn rocket() -> _ {
                 user,
                 commitment_new,
                 commitment,
-                commitment_list,
+                commitment_search,
                 initiative_new,
                 initiative,
-                initiative_list,
+                initiative_search,
                 support_add,
                 support_remove,
-                support_list,
+                support_search,
             ],
         )
         .attach(DbConn::fairing())
