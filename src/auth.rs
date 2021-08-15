@@ -1,7 +1,4 @@
 use blake2::{Blake2s, Digest};
-use diesel::BoolExpressionMethods;
-use diesel::ExpressionMethods;
-use diesel::JoinOnDsl;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
 use diesel::TextExpressionMethods;
@@ -72,14 +69,10 @@ pub async fn search_db(conn: DbConn, search: Search, column: Column) -> Vec<Stri
     conn.run(move |c| {
         use crate::schema::initiatives::dsl::*;
         use crate::schema::supports::dsl::*;
-        let combined = initiatives.inner_join(
-            supports.on(initiative_commitment
-                .eq(commitment)
-                .and(initiative_name.eq(name))),
-        );
+        let combined = initiatives.inner_join(supports);
         let filtered = combined
-            .filter(user.like(to_filter(&search.supporter)))
-            .filter(commitment.like(to_filter(&search.commitment)))
+            .filter(user_name.like(to_filter(&search.support)))
+            .filter(commitment_name.like(to_filter(&search.commitment)))
             .filter(initiative_name.like(to_filter(&search.initiative)));
 
         match column {
@@ -88,9 +81,13 @@ pub async fn search_db(conn: DbConn, search: Search, column: Column) -> Vec<Stri
                 .distinct()
                 .load::<String>(c)
                 .unwrap(),
-            Column::Support => filtered.select(user).distinct().load::<String>(c).unwrap(),
+            Column::Support => filtered
+                .select(user_name)
+                .distinct()
+                .load::<String>(c)
+                .unwrap(),
             Column::Commitment => filtered
-                .select(commitment)
+                .select(commitment_name)
                 .distinct()
                 .load::<String>(c)
                 .unwrap(),

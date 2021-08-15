@@ -39,13 +39,13 @@ ENGINE = InnoDB;
 -- Table `3ways_db`.`initiatives`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `3ways_db`.`initiatives` (
-  `commitment` VARCHAR(45) NOT NULL,
   `name` VARCHAR(45) NOT NULL,
+  `commitment_name` VARCHAR(45) NOT NULL,
   `description` TEXT NOT NULL,
-  PRIMARY KEY (`commitment`, `name`),
-  INDEX `fk_initiatives_commitments_idx` (`commitment` ASC) VISIBLE,
+  PRIMARY KEY (`name`),
+  INDEX `fk_initiatives_commitments_idx` (`commitment_name` ASC) VISIBLE,
   CONSTRAINT `fk_initiatives_commitments`
-    FOREIGN KEY (`commitment`)
+    FOREIGN KEY (`commitment_name`)
     REFERENCES `3ways_db`.`commitments` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
@@ -56,20 +56,19 @@ ENGINE = InnoDB;
 -- Table `3ways_db`.`supports`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `3ways_db`.`supports` (
-  `user` VARCHAR(45) NOT NULL,
-  `initiative_commitment` VARCHAR(45) NOT NULL,
+  `user_name` VARCHAR(45) NOT NULL,
   `initiative_name` VARCHAR(45) NOT NULL,
   `adopt_since` DATETIME NULL,
-  PRIMARY KEY (`user`, `initiative_commitment`, `initiative_name`),
-  INDEX `fk_initiative_supports_initiative_idx` (`initiative_commitment` ASC, `initiative_name` ASC) INVISIBLE,
-  CONSTRAINT `fk_initiative_supports_user`
-    FOREIGN KEY (`user`)
+  PRIMARY KEY (`user_name`, `initiative_name`),
+  INDEX `fk_supports_initiatives_idx` (`initiative_name` ASC) INVISIBLE,
+  CONSTRAINT `fk_supports_users`
+    FOREIGN KEY (`user_name`)
     REFERENCES `3ways_db`.`users` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
-  CONSTRAINT `fk_initiative_supports_initiative`
-    FOREIGN KEY (`initiative_commitment` , `initiative_name`)
-    REFERENCES `3ways_db`.`initiatives` (`commitment` , `name`)
+  CONSTRAINT `fk_supports_initiatives`
+    FOREIGN KEY (`initiative_name`)
+    REFERENCES `3ways_db`.`initiatives` (`name`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;

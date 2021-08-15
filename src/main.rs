@@ -14,6 +14,7 @@ mod auth;
 mod models;
 mod schema;
 
+use chrono::NaiveDateTime;
 use diesel::ExpressionMethods;
 use diesel::OptionalExtension;
 use diesel::QueryDsl;
@@ -24,19 +25,17 @@ use rocket::http::CookieJar;
 use rocket::http::Status;
 use rocket::response::content;
 
-use auth::random_id;
-use auth::DbConn;
-use auth::UserAuth;
-use models::Commitment;
-use models::Initiative;
-use models::Support;
-use models::UserLogin;
-
-use models::User;
-
+use crate::auth::random_id;
 use crate::auth::search_db;
 use crate::auth::Column;
+use crate::auth::DbConn;
+use crate::auth::UserAuth;
+use crate::models::Commitment;
+use crate::models::Initiative;
 use crate::models::Search;
+use crate::models::Support;
+use crate::models::User;
+use crate::models::UserLogin;
 
 #[post("/user_new", data = "<user>")]
 async fn user_new(user: Form<User>, conn: DbConn, cookies: &CookieJar<'_>) -> Status {
@@ -116,7 +115,6 @@ async fn user(
     conn: DbConn,
     user_name: String,
 ) -> Result<content::Json<String>, Status> {
-    println!("{}", &user_name);
     let item = conn
         .run(move |c| {
             use schema::users::dsl::*;
@@ -152,7 +150,7 @@ async fn commitment_new(auth: UserAuth, conn: DbConn, commitment: Form<Commitmen
         .await;
 
     let initiative = Initiative {
-        commitment: commitment_name.clone(),
+        commitment_name: commitment_name.clone(),
         name: "Commitment Writer".to_string(),
         description:
             "Wrote the commitment. This Initiative initially keeps the commitment in existence."
@@ -204,7 +202,6 @@ async fn initiative_new(
     conn: DbConn,
     initiative: Form<Initiative>,
 ) -> Result<String, Status> {
-    let commitment_name = initiative.commitment.clone();
     let initiative_name = conn
         .run(move |c| loop {
             let mut new_initiative = initiative.clone();
@@ -223,7 +220,6 @@ async fn initiative_new(
         .await;
 
     let support = Support {
-        initiative_commitment: commitment_name,
         initiative_name: initiative_name.clone(),
     };
 
@@ -232,18 +228,17 @@ async fn initiative_new(
     Ok(initiative_name)
 }
 
-#[get("/initiative/<commitment_name>/<initiative_name>")]
+#[get("/initiative/<initiative_name>")]
 async fn initiative(
     _auth: UserAuth,
     conn: DbConn,
-    commitment_name: String,
     initiative_name: String,
 ) -> Result<content::Json<String>, Status> {
     let item = conn
         .run(move |c| {
             use schema::initiatives::dsl::*;
             initiatives
-                .find((commitment_name, initiative_name))
+                .find(initiative_name)
                 .get_result::<Initiative>(c)
         })
         .await;
@@ -270,7 +265,7 @@ async fn support_add(auth: UserAuth, conn: DbConn, support: Form<Support>) {
     conn.run(move |c| {
         use schema::supports::dsl::*;
         diesel::insert_or_ignore_into(supports)
-            .values((user.eq(&auth.0), &*support))
+            .values((user_name.eq(&auth.0), &*support))
             .execute(c)
             .unwrap()
     })
@@ -282,13 +277,37 @@ async fn support_remove(auth: UserAuth, conn: DbConn, support: Form<Support>) {
     conn.run(move |c| {
         use schema::supports::dsl::*;
         diesel::delete(supports)
-            .filter(user.eq(&auth.0))
-            .filter(initiative_commitment.eq(&support.initiative_commitment))
+            .filter(user_name.eq(&auth.0))
             .filter(initiative_name.eq(&support.initiative_name))
             .execute(c)
             .unwrap()
     })
     .await;
+}
+
+#[get("/support/<initiative>/<user>")]
+async fn support(
+    _auth: UserAuth,
+    conn: DbConn,
+    initiative: String,
+    user: String,
+) -> Result<content::Json<String>, Status> {
+    let item = conn
+        .run(move |c| {
+            use schema::supports::dsl::*;
+            supports
+                .find((&user, initiative))
+                .select(adopt_since)
+                .get_result::<Option<NaiveDateTime>>(c)
+        })
+        .await;
+
+    if let Ok(user) = item {
+        Ok(content::Json(serde_json::to_string(&user).unwrap()))
+    } else {
+        println!("{:?}", item.err().unwrap());
+        Err(Status::NotFound)
+    }
 }
 
 #[get("/support_search", data = "<search>")]
@@ -322,6 +341,7 @@ fn rocket() -> _ {
                 initiative_search,
                 support_add,
                 support_remove,
+                support,
                 support_search,
             ],
         )
