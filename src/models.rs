@@ -3,7 +3,7 @@ use super::schema::*;
 #[derive(Queryable, FromForm, Insertable, Identifiable, AsChangeset, Serialize, Clone)]
 #[primary_key(name)]
 pub struct User {
-    #[field(validate = len(..=40))]
+    #[field(validate = len(..=45))]
     pub name: String,
     pub password: String,
     pub email: String,

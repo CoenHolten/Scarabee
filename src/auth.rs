@@ -1,6 +1,5 @@
 use blake2::{Blake2s, Digest};
 use diesel::BoolExpressionMethods;
-use diesel::Expression;
 use diesel::ExpressionMethods;
 use diesel::JoinOnDsl;
 use diesel::QueryDsl;

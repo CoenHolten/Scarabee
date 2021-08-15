@@ -18,7 +18,6 @@ use diesel::ExpressionMethods;
 use diesel::OptionalExtension;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
-use diesel::TextExpressionMethods;
 use rocket::form::Form;
 use rocket::http::Cookie;
 use rocket::http::CookieJar;
@@ -40,28 +39,26 @@ use crate::auth::Column;
 use crate::models::Search;
 
 #[post("/user_new", data = "<user>")]
-async fn user_new(user: Form<User>, conn: DbConn, cookies: &CookieJar<'_>) -> String {
-    let name = conn
-        .run(move |c| loop {
-            let mut new_user = user.clone();
-            new_user.name = random_id(&user.name);
-            new_user.hash_password();
+async fn user_new(user: Form<User>, conn: DbConn, cookies: &CookieJar<'_>) -> Status {
+    let mut new_user = user.clone();
+    new_user.hash_password();
 
+    let count = conn
+        .run(move |c| {
             use schema::users::dsl::*;
-            let count = diesel::insert_or_ignore_into(users)
+            diesel::insert_or_ignore_into(users)
                 .values(&new_user)
                 .execute(c)
-                .unwrap();
-
-            if count == 1 {
-                break new_user.name;
-            }
+                .unwrap()
         })
         .await;
 
-    cookies.add_private(Cookie::new("name", name.clone()));
-
-    name
+    if count == 1 {
+        cookies.add_private(Cookie::new("name", user.name.clone()));
+        Status::Created
+    } else {
+        Status::Conflict
+    }
 }
 
 #[post("/user_edit", data = "<user>")]
