@@ -21,7 +21,7 @@ GET  /initiative_search <- Search
 PUT  /support_add/<initiative_name>
 PUT  /support_adopt/<initiative_name>
 PUT  /support_remove/<initiative_name>
-GET  /support -> DateTime
+GET  /support/<initiative>/<user> -> DateTime
 GET  /support_search <- Search
 ```
 
