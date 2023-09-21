@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="nl">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="author" content="TODO" />
+
+        <title>Scarabee</title>
+
+        <meta name="description" content="TODO" />
+
+        <link href="/styles.css" rel="stylesheet" />
+    </head>
+
+    <body>
+        <header>
+            <div class="header__content">
+                <span class="title">Scarabee</span>
+            </div>
+        </header>
+
+        <main>
+            <section>
+                <h2>My account</h2>
+
+                <div class="signup-or-login">
+                    <div>
+                        <h3>Sign up</h3>
+
+                        <form id="user-sign-up" class="form">
+                            <label class="form__row"
+                                >Username
+                                <input type="text" name="name" required="" />
+                            </label>
+                            <label class="form__row"
+                                >Password
+                                <input
+                                    type="password"
+                                    name="description"
+                                    required=""
+                                />
+                            </label>
+
+                            <label class="form__row"
+                                >Email
+                                <input type="email" name="email" required="" />
+                            </label>
+
+                            <label class="form__row"
+                                >Phone number
+                                <input type="tel" name="phone" required="" />
+                            </label>
+
+                            <div class="form__row">
+                                <input type="submit" value="Create account" />
+                            </div>
+                        </form>
+                    </div>
+
+                    <div>
+                        <h3>Log in</h3>
+
+                        <form id="user-login" class="form">
+                            <label class="form__row"
+                                >Username
+                                <input type="text" name="name" required="" />
+                            </label>
+
+                            <label class="form__row"
+                                >Password
+                                <input
+                                    type="password"
+                                    name="description"
+                                    required=""
+                                />
+                            </label>
+
+                            <div class="form__row">
+                                <input type="submit" value="Log in" />
+                            </div>
+                        </form>
+                    </div>
+
+                    <div>
+                        <h3>Log out</h3>
+
+                        <button id="user-logout">Log out</button>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Commitments</h2>
+
+                <h3>Create commitment</h3>
+
+                <form id="new-commitment" class="form">
+                    <label class="form__row"
+                        >Name
+                        <input type="text" name="name" required="" />
+                    </label>
+
+                    <label class="form__row"
+                        >Description
+                        <input type="text" name="description" required="" />
+                    </label>
+
+                    <div class="form__row">
+                        <input type="submit" value="Create commitment" />
+                    </div>
+                </form>
+
+                <h3>All commitments</h3>
+
+                <div id="commitments" class="commitments-list"></div>
+            </section>
+        </main>
+    </body>
+
+    <script type="module" src="/main.js"></script>
+</html>

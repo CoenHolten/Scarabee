@@ -21,6 +21,7 @@ use diesel::OptionalExtension;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
 use rocket::form::Form;
+use rocket::fs::{FileServer, relative};
 use rocket::http::Cookie;
 use rocket::http::CookieJar;
 use rocket::http::Status;
@@ -75,7 +76,7 @@ async fn user_edit(auth: UserAuth, conn: DbConn, mut user: Form<User>) -> Status
     Status::Ok
 }
 
-#[get("/user_login", data = "<user>")]
+#[post("/user_login", data = "<user>")]
 async fn user_login(mut user: Form<UserLogin>, conn: DbConn, cookies: &CookieJar<'_>) -> Status {
     user.hash_password();
 
@@ -115,6 +116,7 @@ async fn user(
     conn: DbConn,
     user_name: String,
 ) -> Result<content::Json<String>, Status> {
+    // TODO: this returns the user password. This is very unsafe.
     let item = conn
         .run(move |c| {
             use schema::users::dsl::*;
@@ -186,7 +188,7 @@ async fn commitment(
     }
 }
 
-#[get("/commitment_search", data = "<search>")]
+#[post("/commitment_search", data = "<search>")]
 async fn commitment_search(
     _auth: UserAuth,
     conn: DbConn,
@@ -246,7 +248,7 @@ async fn initiative(
     }
 }
 
-#[get("/initiative_search", data = "<search>")]
+#[post("/initiative_search", data = "<search>")]
 async fn initiative_search(
     _auth: UserAuth,
     conn: DbConn,
@@ -268,6 +270,7 @@ async fn support_add(auth: UserAuth, conn: DbConn, initiative: String) {
     .await;
 }
 
+// TODO: what is the difference between adding support and adopting?
 #[put("/support_adopt/<initiative>")]
 async fn support_adopt(auth: UserAuth, conn: DbConn, initiative: String) {
     conn.run(move |c| {
@@ -322,7 +325,7 @@ async fn support(
     }
 }
 
-#[get("/support_search", data = "<search>")]
+#[post("/support_search", data = "<search>")]
 async fn support_search(
     _auth: UserAuth,
     conn: DbConn,
@@ -337,8 +340,9 @@ fn rocket() -> _ {
     dotenv::dotenv().ok();
 
     rocket::build()
+        .mount("/", FileServer::from(relative!("/static")))
         .mount(
-            "/",
+            "/api",
             routes![
                 user_new,
                 user_edit,

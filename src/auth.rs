@@ -46,10 +46,13 @@ impl<'r> FromRequest<'r> for UserAuth {
     }
 }
 
+// TODO: Using random ids for unique keys in the db will become slow at one point, and will stop
+// working altogether if every number is used. I don't quite know why this is used, and if I remove
+// this, adding new commitments will loop infinitely.
 pub fn random_id(name: &str) -> String {
     let mut rng = thread_rng();
     let num = rng.gen_range(0..10000);
-    format!("{}#{:04}", name, num)
+    format!("{}-{:04}", name, num)
 }
 
 #[database("3ways_db")]

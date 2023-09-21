@@ -1,2 +1,2 @@
 [global.databases]
-3ways_db = { url = "mysql://root:root@localhost/3ways_db" }
+3ways_db = { url = "mysql://test:test@localhost/3ways_db" }
