@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS `3ways_db`.`supports` (
   `initiative_name` VARCHAR(45) NOT NULL,
   `adopt_since` TIMESTAMP NULL,
   PRIMARY KEY (`user_name`, `initiative_name`),
-  INDEX `fk_supports_initiatives_idx` (`initiative_name` ASC) INVISIBLE,
+  INDEX `fk_supports_initiatives_idx` (`initiative_name` ASC),
   CONSTRAINT `fk_supports_users`
     FOREIGN KEY (`user_name`)
     REFERENCES `3ways_db`.`users` (`name`)
